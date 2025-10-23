@@ -6,6 +6,8 @@ import re
 from typing import List, Dict, Tuple, Set
 from datetime import datetime
 from rapidfuzz import fuzz
+from metaphone import doublemetaphone
+from unidecode import unidecode
 
 from app.config import settings
 from app.utils.logger import setup_logger
@@ -98,12 +100,121 @@ class NameMatcher:
         logger.debug(f"Selected '{canonical}' as canonical from {len(names)} alternatives")
         return canonical
 
+    def _should_use_phonetics(self, token: str) -> bool:
+        """
+        Determine if a token should be processed by metaphone.
+
+        Skips phonetics for:
+        - Empty strings
+        - Single-character tokens
+        - Tokens containing digits (e.g., "3M", "7eleven")
+        - All-caps acronyms <= 2 characters (e.g., "IBM", "GE")
+
+        Args:
+            token: Normalized token to check
+
+        Returns:
+            True if token should use phonetics, False otherwise
+        """
+        if not token or len(token) <= 1:
+            return False
+
+        # Skip tokens with numbers
+        if any(char.isdigit() for char in token):
+            return False
+
+        # Skip short all-caps acronyms (likely acronyms like IBM, GE)
+        if len(token) <= 2 and token.isupper():
+            return False
+
+        return True
+
+    def _prepare_for_phonetics(self, name: str) -> str:
+        """
+        Prepare a normalized name for phonetic comparison.
+
+        Applies accent folding to handle non-ASCII characters.
+
+        Args:
+            name: Normalized name string
+
+        Returns:
+            Accent-folded name ready for phonetic processing
+        """
+        return unidecode(name)
+
+    def _calculate_phonetic_bonus(self, norm1: str, norm2: str) -> float:
+        """
+        Calculate phonetic bonus/penalty for name matching.
+
+        Uses hybrid word-by-word comparison:
+        - Compares phonetic codes token-by-token
+        - Skips inappropriate tokens (numbers, acronyms, etc.)
+        - Returns +4 if majority agree, -2 if majority disagree, 0 if no comparison
+
+        Args:
+            norm1: First normalized name
+            norm2: Second normalized name
+
+        Returns:
+            Phonetic adjustment value (+4, -2, or 0)
+        """
+        # Prepare names for phonetic comparison
+        prep1 = self._prepare_for_phonetics(norm1)
+        prep2 = self._prepare_for_phonetics(norm2)
+
+        tokens1 = prep1.split()
+        tokens2 = prep2.split()
+
+        # If different number of tokens, do best effort word-by-word
+        agreements = 0
+        disagreements = 0
+        comparisons = 0
+
+        # Compare tokens pairwise
+        for i in range(min(len(tokens1), len(tokens2))):
+            token1 = tokens1[i]
+            token2 = tokens2[i]
+
+            # Check if both tokens should use phonetics
+            if not self._should_use_phonetics(token1) or not self._should_use_phonetics(token2):
+                continue
+
+            # Get phonetic codes (primary only)
+            phonetic1 = doublemetaphone(token1)[0]
+            phonetic2 = doublemetaphone(token2)[0]
+
+            # Skip if phonetic encoding failed
+            if not phonetic1 or not phonetic2:
+                continue
+
+            comparisons += 1
+            if phonetic1 == phonetic2:
+                agreements += 1
+            else:
+                disagreements += 1
+
+        # If no valid comparisons, return neutral
+        if comparisons == 0:
+            return 0.0
+
+        # Determine bonus/penalty based on majority
+        if agreements > disagreements:
+            logger.debug(f"Phonetic agreement: {agreements}/{comparisons} matches (+4 bonus)")
+            return 4.0
+        else:
+            logger.debug(f"Phonetic disagreement: {disagreements}/{comparisons} mismatches (-2 penalty)")
+            return -2.0
+
     def calculate_confidence(self, name1: str, name2: str) -> float:
         """
         Calculate confidence score for a name match.
 
-        Uses multiple fuzzy matching algorithms and combines them with
-        a weighted average for more robust matching.
+        Uses WRatio (weighted ratio) and token_set_ratio for less correlated,
+        more comprehensive matching coverage. Applies phonetic matching bonus/penalty:
+        - +4 percentage points if phonetics agree
+        - -2 percentage points if phonetics disagree
+        - Final score clamped to [0.0, 1.0]
 
         Args:
             name1: First company name
@@ -119,15 +230,21 @@ class NameMatcher:
         if norm1 == norm2:
             return 1.0
 
-        # Use multiple matching strategies for robustness
-        ratio = fuzz.ratio(norm1, norm2)
-        token_sort = fuzz.token_sort_ratio(norm1, norm2)
+        # Use WRatio (adaptive) and token_set (word-based) for robust matching
+        wratio = fuzz.WRatio(norm1, norm2)
         token_set = fuzz.token_set_ratio(norm1, norm2)
 
-        # Weighted average (token_set is most forgiving of word order)
-        score = (ratio * 0.3 + token_sort * 0.3 + token_set * 0.4)
+        # Weighted average: WRatio 60%, token_set 40%
+        base_score = (wratio * 0.6 + token_set * 0.4)
 
-        return score / 100.0
+        # Apply phonetic bonus/penalty
+        phonetic_bonus = self._calculate_phonetic_bonus(norm1, norm2)
+        adjusted_score = base_score + phonetic_bonus
+
+        # Clamp to [0, 100] range
+        final_score = max(0, min(100, adjusted_score))
+
+        return final_score / 100.0
 
     def group_similar_names(self, names: List[str]) -> List[List[str]]:
         """

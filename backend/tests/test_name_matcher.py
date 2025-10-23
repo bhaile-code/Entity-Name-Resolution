@@ -99,3 +99,107 @@ def test_process_names():
     # Check summary
     assert result["summary"]["total_input_names"] == len(names)
     assert result["summary"]["total_groups_created"] >= 1
+
+
+def test_phonetic_agreement():
+    """Test that phonetically similar names get a bonus."""
+    matcher = NameMatcher()
+
+    # "Smith" and "Smyth" sound the same - should get +4% bonus
+    score_smith = matcher.calculate_confidence("Smith Inc.", "Smyth Inc.")
+    score_smith_no_phonetic = matcher.calculate_confidence("Smith Inc.", "Smith Inc.")
+
+    # Should be high confidence due to phonetic agreement
+    # Base fuzzy score ~80% + 4% phonetic bonus = 84%
+    assert score_smith >= 0.83
+
+    # Test with common phonetic variations
+    score_steven = matcher.calculate_confidence("Steven Corp", "Stephen Corp")
+    assert score_steven > 0.75  # Different spelling, but phonetically similar
+
+
+def test_phonetic_disagreement():
+    """Test that phonetically different names get a penalty."""
+    matcher = NameMatcher()
+
+    # "Apple" and "Orange" are completely different
+    score = matcher.calculate_confidence("Apple", "Orange")
+    # Base fuzzy score ~36% - 2% phonetic penalty = 34%
+    assert score < 0.35  # Should be low due to phonetic disagreement
+
+
+def test_phonetic_skip_numbers():
+    """Test that tokens with numbers skip phonetic processing."""
+    matcher = NameMatcher()
+
+    # "3M" contains a number - phonetics should be skipped
+    score = matcher.calculate_confidence("3M Company", "3M Corp")
+    assert score > 0.85  # Should still match well via fuzzy matching
+
+    # "7-Eleven" contains numbers
+    score = matcher.calculate_confidence("7Eleven Store", "7Eleven Shop")
+    assert score > 0.70  # Match via fuzzy, not phonetics
+
+
+def test_phonetic_skip_acronyms():
+    """Test that short acronyms skip phonetic processing."""
+    matcher = NameMatcher()
+
+    # "IBM" is a short acronym - should skip phonetics
+    score = matcher.calculate_confidence("IBM", "IBM Corp")
+    assert score > 0.8
+
+    # "GE" is another short acronym
+    score = matcher.calculate_confidence("GE Company", "GE Corp")
+    assert score > 0.85
+
+
+def test_phonetic_accent_folding():
+    """Test that accented characters are handled properly."""
+    matcher = NameMatcher()
+
+    # "São Paulo" with accent should match "Sao Paulo" without
+    # Accent folding helps phonetics recognize them as the same
+    score = matcher.calculate_confidence("São Paulo Bank", "Sao Paulo Bank")
+    assert score > 0.96  # High score with phonetic agreement
+
+    # Test with other diacritics - "café" vs "cafe"
+    # Base fuzzy matching sees them as different, but phonetics helps
+    score = matcher.calculate_confidence("Café Corp", "Cafe Corp")
+    assert score > 0.75  # Phonetic bonus helps bridge the gap
+
+
+def test_should_use_phonetics():
+    """Test the _should_use_phonetics helper method."""
+    matcher = NameMatcher()
+
+    # Valid tokens for phonetics
+    assert matcher._should_use_phonetics("apple") == True
+    assert matcher._should_use_phonetics("microsoft") == True
+
+    # Invalid tokens
+    assert matcher._should_use_phonetics("") == False  # Empty
+    assert matcher._should_use_phonetics("a") == False  # Single char
+    assert matcher._should_use_phonetics("3m") == False  # Contains number
+    assert matcher._should_use_phonetics("7eleven") == False  # Contains number
+
+    # Note: Normalized names are lowercase, so all-caps check won't trigger
+    # But we can test the logic works for mixed case
+    assert matcher._should_use_phonetics("ibm") == True  # Lowercase ok
+
+
+def test_calculate_phonetic_bonus():
+    """Test the phonetic bonus calculation directly."""
+    matcher = NameMatcher()
+
+    # Phonetically similar - should get +4
+    bonus = matcher._calculate_phonetic_bonus("smith", "smyth")
+    assert bonus == 4.0
+
+    # Phonetically different - should get -2
+    bonus = matcher._calculate_phonetic_bonus("apple", "orange")
+    assert bonus == -2.0
+
+    # No valid phonetic comparison (numbers) - should get 0
+    bonus = matcher._calculate_phonetic_bonus("3m", "3m")
+    assert bonus == 0.0

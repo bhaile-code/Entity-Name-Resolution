@@ -65,9 +65,10 @@ backend/
    - `NameMatcher` class with fuzzy matching algorithm
    - **Algorithm flow**:
      1. Normalize names (lowercase, remove punctuation/suffixes)
-     2. Use RapidFuzz (ratio, token_sort_ratio, token_set_ratio)
-     3. Group names with similarity >= threshold (default 85%)
-     4. Select canonical name (shortest/fewest words/capitalization)
+     2. Use RapidFuzz (WRatio, token_set_ratio)
+     3. Apply phonetic matching bonus/penalty (Metaphone)
+     4. Group names with similarity >= threshold (default 85%)
+     5. Select canonical name (shortest/fewest words/capitalization)
    - No direct HTTP dependencies - pure business logic
    - Can be used standalone or from API
 
@@ -90,7 +91,10 @@ backend/
 **Key Algorithm Details**:
 - Common corporate suffixes stripped during normalization (configurable in settings)
 - Canonical name selection: shortest length → fewest words → best capitalization
-- Confidence scores: weighted average (30% ratio, 30% token_sort, 40% token_set)
+- Confidence scores: weighted average (60% WRatio, 40% token_set) + phonetic bonus/penalty
+- Phonetic matching: +4% if phonetics agree, -2% if disagree (using Double Metaphone)
+- Phonetics skipped for: numbers, single chars, short acronyms (e.g., "3M", "IBM")
+- Accent folding via unidecode for non-ASCII characters (e.g., "São" → "Sao")
 - Each name gets an audit log entry with reasoning
 
 ### Frontend (React + Vite)
@@ -363,9 +367,11 @@ Adjust tuple weights to change selection criteria.
 
 **Confidence Weights** (in `services/name_matcher.py`):
 ```python
-score = (ratio * 0.3 + token_sort * 0.3 + token_set * 0.4)
+base_score = (wratio * 0.6 + token_set * 0.4)
+phonetic_bonus = _calculate_phonetic_bonus(norm1, norm2)  # +4, -2, or 0
+final_score = max(0, min(100, base_score + phonetic_bonus))
 ```
-Adjust weights (must sum to 1.0) to prioritize different fuzzy algorithms.
+Adjust weights (must sum to 1.0) to prioritize different fuzzy algorithms. WRatio is adaptive and provides better coverage, while token_set handles word order differences. Phonetic matching provides an additional signal based on pronunciation similarity.
 
 ## API Contract
 

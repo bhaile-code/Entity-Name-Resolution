@@ -9,7 +9,10 @@
       "Bash(\"./venv/Scripts/pip\" install --upgrade pip)",
       "Bash(\"./venv/Scripts/python\" -m pytest tests/test_name_matcher.py -v)",
       "Bash(timeout 5 \"./venv/Scripts/python\" -m app.main)",
-      "Bash(\"./venv/Scripts/python\" test_workflow.py)"
+      "Bash(\"./venv/Scripts/python\" test_workflow.py)",
+      "Bash(\"./venv/Scripts/python\" -c \"from metaphone import doublemetaphone; from unidecode import unidecode; print(''Imports successful''); print(''Test:'', doublemetaphone(''Smith'')); print(''Test:'', unidecode(''São Paulo''))\")",
+      "Bash(timeout 5:*)",
+      "Bash(\"./venv/Scripts/python\" -c \"\nfrom app.services import NameMatcher\nimport sys\n\nprint(''='' * 60)\nprint(''Phonetic Matching Demo'')\nprint(''='' * 60)\n\nmatcher = NameMatcher()\n\n# Test cases showing phonetic bonus/penalty\ntest_cases = [\n    (''Smith Inc.'', ''Smyth Inc.'', ''Phonetic agreement''),\n    (''Steven Corp'', ''Stephen Corp'', ''Phonetic agreement''),\n    (''Microsoft'', ''Microsof'', ''Phonetic agreement''),\n    (''Apple'', ''Orange'', ''Phonetic disagreement''),\n    (''3M Company'', ''3M Corp'', ''Numbers skipped''),\n    (''IBM Corp'', ''IBM Inc'', ''Acronym skipped''),\n    (''São Paulo'', ''Sao Paulo'', ''Accent folding''),\n]\n\nfor name1, name2, description in test_cases:\n    score = matcher.calculate_confidence(name1, name2)\n    print(f''\\n{description}:'')\n    print(f''  \"\"{name1}\"\" vs \"\"{name2}\"\"'')\n    print(f''  Confidence: {score:.2%}'')\n\nprint(''\\n'' + ''='' * 60)\n\")"
     ],
     "deny": [],
     "ask": []

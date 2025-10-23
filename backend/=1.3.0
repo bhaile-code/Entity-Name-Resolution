@@ -1,0 +1,8 @@
+Collecting Metaphone
+  Using cached metaphone-0.6-py3-none-any.whl
+Collecting Unidecode
+  Using cached Unidecode-1.4.0-py3-none-any.whl.metadata (13 kB)
+Using cached Unidecode-1.4.0-py3-none-any.whl (235 kB)
+Installing collected packages: Metaphone, Unidecode
+
+Successfully installed Metaphone-0.6 Unidecode-1.4.0
