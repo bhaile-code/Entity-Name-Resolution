@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(python -m venv:*)",
+      "Bash(venvScriptspip install -r requirements.txt)",
+      "Bash(\"./venv/Scripts/pip\" install -r requirements.txt)",
+      "Bash(\"./venv/Scripts/pip\" install --upgrade pip)",
+      "Bash(\"./venv/Scripts/python\" -m pytest tests/test_name_matcher.py -v)",
+      "Bash(timeout 5 \"./venv/Scripts/python\" -m app.main)",
+      "Bash(\"./venv/Scripts/python\" test_workflow.py)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
