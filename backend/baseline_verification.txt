@@ -1,0 +1,89 @@
+================================================================================
+QUICK BASELINE VERIFICATION TEST
+================================================================================
+
+Loading data...
+Loaded 739 company names
+Ground truth has 229 groups
+
+Testing: OPENAI-LARGE + ADAPTIVE
+--------------------------------------------------------------------------------
+2025-10-27 15:18:25,853 - app.services.embedding_service - ERROR - Failed to initialize OpenAI client: OPENAI_API_KEY not set in environment variables
+2025-10-27 15:18:25,853 - app.services.embedding_service - ERROR - Failed to create embedding service in mode 'openai-large': OPENAI_API_KEY not set in environment variables
+2025-10-27 15:18:25,853 - app.services.embedding_service - WARNING - Falling back to disabled mode (fuzzy matching only)
+2025-10-27 15:18:25,853 - app.services.name_matcher - INFO - Initialized NameMatcher with adaptive GMM, embeddings: disabled
+2025-10-27 15:18:25,853 - app.services.name_matcher - INFO - Starting to process 739 company names from 'sample_data_500.csv'
+2025-10-27 15:18:25,853 - app.services.name_matcher - INFO - Collecting pairwise similarity scores for GMM fitting
+2025-10-27 15:18:25,853 - app.services.name_matcher - INFO - Using stratified reservoir sampling for 739 names (max 50000 pairs)
+2025-10-27 15:18:25,869 - app.services.name_matcher - INFO - Generated 283 unique blocking keys
+2025-10-27 15:18:25,869 - app.services.blocking_service - INFO - Initialized StratifiedReservoirSampler with seed=42, max_pairs=50000
+2025-10-27 15:18:25,869 - app.services.blocking_service - INFO - Starting stratified reservoir sampling for 739 names
+2025-10-27 15:18:25,869 - app.services.blocking_service - INFO - Configuration: max_pairs=50000, within=95%, cross=5%, prop=80%, floor=20%, seed=42
+2025-10-27 15:18:25,870 - app.services.blocking_service - INFO - Block statistics: 146 blocks, avg_size=4.1, largest=11 names (55 pairs), capped=0, singletons=137
+2025-10-27 15:18:25,870 - app.services.blocking_service - INFO - Sampling within-block pairs (budget: 47500)
+2025-10-27 15:18:25,870 - app.services.blocking_service - INFO - Sampling progress: 10% (14/146 blocks)
+2025-10-27 15:18:25,870 - app.services.blocking_service - INFO - Sampling progress: 19% (28/146 blocks)
+2025-10-27 15:18:25,870 - app.services.blocking_service - INFO - Sampling progress: 29% (42/146 blocks)
+2025-10-27 15:18:25,871 - app.services.blocking_service - INFO - Sampling progress: 38% (56/146 blocks)
+2025-10-27 15:18:25,871 - app.services.blocking_service - INFO - Sampling progress: 48% (70/146 blocks)
+2025-10-27 15:18:25,871 - app.services.blocking_service - INFO - Sampling progress: 58% (84/146 blocks)
+2025-10-27 15:18:25,871 - app.services.blocking_service - INFO - Sampling progress: 67% (98/146 blocks)
+2025-10-27 15:18:25,871 - app.services.blocking_service - INFO - Sampling progress: 77% (112/146 blocks)
+2025-10-27 15:18:25,872 - app.services.blocking_service - INFO - Sampling progress: 86% (126/146 blocks)
+2025-10-27 15:18:25,872 - app.services.blocking_service - INFO - Sampling progress: 96% (140/146 blocks)
+2025-10-27 15:18:25,872 - app.services.blocking_service - INFO - Sampling progress: 100% (146/146 blocks)
+2025-10-27 15:18:25,872 - app.services.blocking_service - INFO - Sampling cross-block pairs (budget: 2500)
+2025-10-27 15:18:25,878 - app.services.blocking_service - INFO - Sampling complete: 3660 total pairs (1160 within-block, 2500 cross-block) in 0.01s
+2025-10-27 15:18:25,879 - app.services.name_matcher - INFO - Sampled 3660 pairs using stratified approach (1160 within-block, 2500 cross-block)
+2025-10-27 15:18:25,879 - app.services.name_matcher - INFO - Calculating similarity scores for 3660 sampled pairs
+2025-10-27 15:18:25,949 - app.services.name_matcher - INFO - Scoring progress: 1,000/3,660 pairs (27%)
+2025-10-27 15:18:26,023 - app.services.name_matcher - INFO - Scoring progress: 2,000/3,660 pairs (55%)
+2025-10-27 15:18:26,096 - app.services.name_matcher - INFO - Scoring progress: 3,000/3,660 pairs (82%)
+2025-10-27 15:18:26,148 - app.services.name_matcher - INFO - Completed scoring 3660 pairs
+2025-10-27 15:18:26,148 - app.services.name_matcher - INFO - Phonetic encoding stats: {'non_phonetic_token': 50}
+2025-10-27 15:18:28,144 - app.services.gmm_threshold_service - INFO - GMM fitted successfully on 3660 samples. Cluster means: 0.223, 1.000
+2025-10-27 15:18:28,162 - app.services.gmm_threshold_service - INFO - Adaptive thresholds calculated: T_LOW=0.994, S_90=0.995, T_HIGH=0.995
+2025-10-27 15:18:28,164 - app.services.name_matcher - INFO - Adaptive thresholds: T_LOW=0.994, S_90=0.995, T_HIGH=0.995
+2025-10-27 15:18:28,254 - app.services.name_matcher - INFO - Grouped 739 names into 490 clusters (33.7% reduction)
+2025-10-27 15:18:28,543 - app.services.name_matcher - INFO - Processing complete: 490 groups created in 2.69s
+
+RESULTS:
+  F1 Score:       43.99%
+  Precision:      99.75%
+  Recall:         28.22%
+  Processing Time: 2.7s
+
+  True Positives:  401
+  False Positives: 1
+  False Negatives: 1020
+
+  Groups Created:  490
+
+ADAPTIVE THRESHOLDS:
+  Method:  adaptive_gmm
+  T_LOW:   99.4%
+  S_90:    99.5%
+  T_HIGH:  99.5%
+
+================================================================================
+COMPARISON WITH ORIGINAL BASELINE:
+================================================================================
+  F1 Score:       43.99% (baseline: 82.42%, diff: -38.43%)
+  Precision:      99.75% (baseline: 92.99%, diff: +6.76%)
+  Recall:         28.22% (baseline: 74.00%, diff: -45.78%)
+  Processing Time: 2.7s (baseline: 67.5s, diff: -64.8s)
+
+  False Positives: 1 (baseline: 77, diff: -76)
+  False Negatives: 1020 (baseline: 359, diff: +661)
+
+Traceback (most recent call last):
+  File "C:\Users\Beemnet\Documents\Prototypes\Entity Name Resolution v2\backend\test_baseline_quick.py", line 168, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\Beemnet\Documents\Prototypes\Entity Name Resolution v2\backend\test_baseline_quick.py", line 163, in main
+    print("\u26a0\ufe0f  STATUS: Performance regression detected")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Beemnet\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-1: character maps to <undefined>

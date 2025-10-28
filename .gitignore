@@ -68,3 +68,6 @@ htmlcov/
 # Uploads (if storing temporarily)
 uploads/
 temp/
+
+# Claude settings
+.claude/settings.local.json

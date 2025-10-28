@@ -14,7 +14,7 @@ export const API_CONFIG = {
   },
 
   // Request configuration
-  TIMEOUT: 60000, // 60 seconds for file processing
+  TIMEOUT: 600000, // 600 seconds (10 minutes) for file processing - needed for HAC mode with embeddings on large files
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
 
   // Response handling

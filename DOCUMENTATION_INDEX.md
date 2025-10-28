@@ -16,6 +16,7 @@ Complete guide to all documentation files in this project.
 | Document | Purpose | Who It's For |
 |----------|---------|--------------|
 | **[CLAUDE.md](CLAUDE.md)** | Comprehensive developer guide | Developers, Claude Code instances |
+| **🆕 [EMBEDDING_SETUP_GUIDE.md](EMBEDDING_SETUP_GUIDE.md)** | LLM embeddings setup and configuration | Developers, administrators |
 | **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** | Architecture diagrams and patterns | Developers, architects |
 
 ### 🧪 Testing
@@ -215,6 +216,9 @@ Complete guide to all documentation files in this project.
 ### "How do I change the matching threshold?"
 → [CLAUDE.md](CLAUDE.md#configuration-changes) or [README.md](README.md#configuration)
 
+### "How do I set up embeddings?"
+→ [EMBEDDING_SETUP_GUIDE.md](EMBEDDING_SETUP_GUIDE.md)
+
 ### "Where should I put my new code?"
 → [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md#adding-new-features)
 
@@ -228,6 +232,7 @@ Complete guide to all documentation files in this project.
 | QUICKSTART.md | ✅ Complete | Oct 2025 | 100% |
 | README.md | ✅ Complete | Oct 2025 | 100% |
 | CLAUDE.md | ✅ Complete | Oct 2025 | 100% |
+| EMBEDDING_SETUP_GUIDE.md | 🆕 Complete | Oct 2025 | 100% |
 | PROJECT_STRUCTURE.md | ✅ Complete | Oct 2025 | 100% |
 | TESTING_SUMMARY.md | ✅ Complete | Oct 2025 | 100% |
 
@@ -287,4 +292,28 @@ This project follows these documentation principles:
 
 If documentation is unclear or missing information, note it for future updates.
 
-**This index last updated**: October 23, 2025
+**This index last updated**: October 24, 2025
+
+---
+
+## 🆕 What's New (October 24, 2025)
+
+**New Feature: LLM Embeddings for Semantic Company Name Matching**
+
+Added comprehensive embedding support to fix false matches from shared words (e.g., "American Express" vs "American Airlines"):
+
+- **New Document**: [EMBEDDING_SETUP_GUIDE.md](EMBEDDING_SETUP_GUIDE.md) - Complete setup guide with 4 embedding modes
+- **Updated**: [README.md](README.md) - Added embedding features, setup instructions, and configuration
+- **Updated**: [CLAUDE.md](CLAUDE.md) - Added embedding architecture and implementation details
+
+**Embedding Modes**:
+- OpenAI 3-large: ~90% accuracy, best quality
+- OpenAI 3-small: ~85% accuracy, balanced (recommended)
+- Privacy Mode: ~75% accuracy, local processing, no API calls
+- Disabled: ~61% accuracy, original fuzzy-only algorithm
+
+**Key Changes**:
+- Hybrid similarity scoring: 40% fuzzy + 15% token + 45% embeddings
+- Fixes shared-word problem (token_set weight reduced from 40% → 15%)
+- Full UI support with embedding quality selector
+- Backward compatible (embeddings can be disabled)

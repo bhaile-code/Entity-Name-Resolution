@@ -2,7 +2,7 @@
 API route handlers.
 Separates endpoint logic from application setup.
 """
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Query
 
 from app.models import ProcessingResult
 from app.services import NameMatcher
@@ -14,9 +14,6 @@ logger = setup_logger(__name__)
 
 # Create router
 router = APIRouter()
-
-# Initialize the name matcher (singleton for this module)
-name_matcher = NameMatcher()
 
 
 @router.get("/health")
@@ -38,7 +35,14 @@ async def health_check():
 
 
 @router.post("/process", response_model=ProcessingResult)
-async def process_companies(file: UploadFile = File(...)):
+async def process_companies(
+    file: UploadFile = File(...),
+    use_adaptive_threshold: bool = Query(default=False),
+    embedding_mode: str = Query(default=None),
+    clustering_mode: str = Query(default=None),
+    hac_threshold: float = Query(default=None),
+    hac_linkage: str = Query(default=None)
+):
     """
     Process uploaded CSV file containing company names.
 
@@ -47,9 +51,19 @@ async def process_companies(file: UploadFile = File(...)):
 
     Args:
         file: Uploaded CSV file
+        use_adaptive_threshold: (Deprecated) If True, use GMM-based adaptive thresholding
+        embedding_mode: Embedding mode ('openai-small', 'openai-large', 'local', 'disabled')
+                       If None, uses DEFAULT_EMBEDDING_MODE from settings
+        clustering_mode: Clustering mode ('fixed', 'adaptive_gmm', 'hac')
+                        If None, uses CLUSTERING_MODE from settings or infers from use_adaptive_threshold
+        hac_threshold: HAC distance threshold (0-1 range, e.g., 0.42 for 58% similarity)
+                      If None, uses HAC_DISTANCE_THRESHOLD from settings
+        hac_linkage: HAC linkage method ('average', 'single', 'complete', 'ward')
+                    If None, uses HAC_LINKAGE_METHOD from settings
 
     Returns:
-        ProcessingResult with mappings, audit log, and summary statistics
+        ProcessingResult with mappings, audit log, summary statistics, and optional metadata
+        (gmm_metadata for adaptive_gmm mode, hac_metadata for hac mode)
 
     Raises:
         HTTPException: 400 for invalid input, 500 for processing errors
@@ -69,10 +83,26 @@ async def process_companies(file: UploadFile = File(...)):
         # Extract company names
         company_names, column_name = CSVHandler.extract_company_names(df)
 
-        logger.info(f"Processing {len(company_names)} unique company names from '{file.filename}'")
+        # Determine clustering mode for logging
+        effective_mode = clustering_mode or ('adaptive_gmm' if use_adaptive_threshold else settings.CLUSTERING_MODE)
+
+        logger.info(
+            f"Processing {len(company_names)} unique company names from '{file.filename}' "
+            f"(mode={effective_mode}, embedding={embedding_mode or 'default'}, "
+            f"hac_threshold={hac_threshold or 'default'}, hac_linkage={hac_linkage or 'default'})"
+        )
+
+        # Initialize matcher with appropriate mode
+        matcher = NameMatcher(
+            use_adaptive_threshold=use_adaptive_threshold,
+            embedding_mode=embedding_mode,
+            clustering_mode=clustering_mode,
+            hac_threshold=hac_threshold,
+            hac_linkage=hac_linkage
+        )
 
         # Process names through matcher
-        result = name_matcher.process_names(company_names, filename=file.filename)
+        result = matcher.process_names(company_names, filename=file.filename)
 
         logger.info(
             f"Successfully processed {len(result['mappings'])} companies into "

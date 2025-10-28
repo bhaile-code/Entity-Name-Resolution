@@ -1,0 +1,45 @@
+{
+  "HAC-0.42 (Default - 58% similarity)": {
+    "configuration": {
+      "embedding_mode": "openai-large",
+      "clustering_mode": "hac",
+      "hac_threshold": 0.42,
+      "hac_linkage": "average"
+    },
+    "metrics": {
+      "f1_score": 0.43993417443774,
+      "precision": 0.9975124378109452,
+      "recall": 0.2821956368754398,
+      "true_positives": 401,
+      "false_positives": 1,
+      "false_negatives": 1020
+    },
+    "processing_time_seconds": 12.93123173713684,
+    "groups_created": 490,
+    "reduction_percentage": 33.694181326116365,
+    "hac_metadata": {
+      "method": "hac",
+      "linkage_method": "average",
+      "threshold": 0.42,
+      "total_names": 739,
+      "total_clusters": 490,
+      "reduction_percentage": 33.69,
+      "avg_cluster_size": 1.51,
+      "max_cluster_size": 5,
+      "singleton_clusters": 350,
+      "avg_distance_all_pairs": 0.8539,
+      "avg_distance_within_clusters": 0.0,
+      "cophenetic_distance": 0.5768
+    },
+    "threshold_info": {
+      "method": "hac",
+      "hac_threshold": 0.42,
+      "hac_linkage": "average",
+      "fixed_threshold": null,
+      "t_low": null,
+      "s_90": null,
+      "t_high": null,
+      "fallback_reason": null
+    }
+  }
+}

@@ -56,7 +56,7 @@ function App() {
 
         {results && (
           <div className="results-container">
-            <Summary summary={results.summary} />
+            <Summary summary={results.summary} gmmMetadata={results.gmm_metadata} />
 
             <div className="tabs">
               <button

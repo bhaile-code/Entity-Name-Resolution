@@ -1,0 +1,92 @@
+{
+  "analysis_date": "2025-10-27 14:45:19",
+  "dataset_size": 739,
+  "ground_truth_groups": 229,
+  "best_configuration": "OPENAI-LARGE + ADAPTIVE",
+  "results": [
+    {
+      "name": "OPENAI-LARGE + ADAPTIVE",
+      "metrics": {
+        "purity": 0.9911208576998051,
+        "completeness": 0.9338064046579331,
+        "pair_accuracy": 0.998173557508308,
+        "precision": 0.8939526730937774,
+        "recall": 0.7385952208544533,
+        "f1_score": 0.8088818398096748,
+        "true_positives": 1020,
+        "true_negatives": 262399,
+        "false_positives": 121,
+        "false_negatives": 361,
+        "total_pairs": 263901,
+        "num_test_groups": 285,
+        "num_gt_groups": 229
+      },
+      "processing_time": 85.49989748001099,
+      "num_groups": 285,
+      "reduction_pct": 61.43437077131259
+    },
+    {
+      "name": "OPENAI-SMALL + ADAPTIVE",
+      "metrics": {
+        "purity": 0.9912759384590369,
+        "completeness": 0.9338064046579331,
+        "pair_accuracy": 0.9981546110094316,
+        "precision": 0.8900523560209425,
+        "recall": 0.7385952208544533,
+        "f1_score": 0.8072813612979818,
+        "true_positives": 1020,
+        "true_negatives": 262394,
+        "false_positives": 126,
+        "false_negatives": 361,
+        "total_pairs": 263901,
+        "num_test_groups": 284,
+        "num_gt_groups": 229
+      },
+      "processing_time": 94.01877236366272,
+      "num_groups": 284,
+      "reduction_pct": 61.56968876860623
+    },
+    {
+      "name": "OPENAI-LARGE + FIXED",
+      "metrics": {
+        "purity": 1.0,
+        "completeness": 0.7794950440146946,
+        "pair_accuracy": 0.9964304796116725,
+        "precision": 1.0,
+        "recall": 0.31788559015206375,
+        "f1_score": 0.4824175824175825,
+        "true_positives": 439,
+        "true_negatives": 262520,
+        "false_positives": 0,
+        "false_negatives": 942,
+        "total_pairs": 263901,
+        "num_test_groups": 473,
+        "num_gt_groups": 229
+      },
+      "processing_time": 210.54876923561096,
+      "num_groups": 473,
+      "reduction_pct": 35.994587280108256
+    },
+    {
+      "name": "OPENAI-SMALL + FIXED",
+      "metrics": {
+        "purity": 0.999290780141844,
+        "completeness": 0.778767241976849,
+        "pair_accuracy": 0.9964191117123467,
+        "precision": 0.9954545454545455,
+        "recall": 0.3171614771904417,
+        "f1_score": 0.4810543657331136,
+        "true_positives": 438,
+        "true_negatives": 262518,
+        "false_positives": 2,
+        "false_negatives": 943,
+        "total_pairs": 263901,
+        "num_test_groups": 472,
+        "num_gt_groups": 229
+      },
+      "processing_time": 244.6044578552246,
+      "num_groups": 472,
+      "reduction_pct": 36.129905277401896
+    }
+  ]
+}
