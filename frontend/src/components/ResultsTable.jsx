@@ -81,17 +81,29 @@ function ResultsTable({ mappings }) {
                   <strong>{mapping.canonical_name}</strong>
                 </td>
                 <td>
-                  <span
-                    className={`confidence-badge ${
-                      mapping.confidence_score >= 0.9
-                        ? 'high'
-                        : mapping.confidence_score >= 0.7
-                        ? 'medium'
-                        : 'low'
-                    }`}
-                  >
-                    {(mapping.confidence_score * 100).toFixed(0)}%
-                  </span>
+                  <div className="confidence-cell">
+                    <span
+                      className={`confidence-badge ${
+                        mapping.confidence_score >= 0.9
+                          ? 'high'
+                          : mapping.confidence_score >= 0.7
+                          ? 'medium'
+                          : 'low'
+                      }`}
+                    >
+                      {(mapping.confidence_score * 100).toFixed(0)}%
+                    </span>
+                    {mapping.llm_reviewed && (
+                      <span
+                        className={`llm-badge llm-${mapping.llm_decision}`}
+                        title={`LLM Decision: ${mapping.llm_decision}`}
+                      >
+                        {mapping.llm_decision === 'same' && '🤖✓'}
+                        {mapping.llm_decision === 'different' && '🤖✗'}
+                        {mapping.llm_decision === 'unknown' && '🤖❓'}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td>{mapping.group_id}</td>
               </tr>

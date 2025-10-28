@@ -8,6 +8,8 @@ function FileUpload({ onFileProcessed, onError, loading, setLoading }) {
   const [embeddingMode, setEmbeddingMode] = useState('openai-small')
   const [hacThreshold, setHacThreshold] = useState(0.42) // Default: 42% distance = 58% similarity
   const [apiError, setApiError] = useState(null)
+  const [useLlmBorderline, setUseLlmBorderline] = useState(false) // NEW: LLM borderline assessment
+  const [progress, setProgress] = useState(null) // NEW: Progress tracking
 
   const handleDrag = (e) => {
     e.preventDefault()
@@ -46,11 +48,26 @@ function FileUpload({ onFileProcessed, onError, loading, setLoading }) {
     setFileName(file.name)
     setLoading(true)
     setApiError(null)
+    setProgress({ phase: 'upload', percent: 0 }) // Initialize progress
 
     try {
       const useAdaptive = thresholdMode === 'adaptive'
       const clusteringMode = thresholdMode === 'adaptive' ? 'adaptive_gmm' : (thresholdMode === 'hac' ? 'hac' : 'fixed')
-      const data = await uploadFile(file, useAdaptive, embeddingMode, clusteringMode, hacThreshold)
+
+      // Progress callback
+      const onProgressUpdate = (prog) => {
+        setProgress(prog)
+      }
+
+      const data = await uploadFile(
+        file,
+        useAdaptive,
+        embeddingMode,
+        clusteringMode,
+        hacThreshold,
+        useLlmBorderline,  // NEW: Pass LLM parameter
+        onProgressUpdate   // NEW: Progress callback
+      )
       onFileProcessed(data)
     } catch (err) {
       const errorMsg = err.message || 'Failed to process file'
@@ -63,6 +80,7 @@ function FileUpload({ onFileProcessed, onError, loading, setLoading }) {
       onError(errorMsg)
     } finally {
       setLoading(false)
+      setProgress(null) // Clear progress
     }
   }
 
@@ -150,6 +168,29 @@ function FileUpload({ onFileProcessed, onError, loading, setLoading }) {
               <p className="slider-hint">
                 Lower values = stricter grouping (more groups), Higher values = looser grouping (fewer groups)
               </p>
+            </div>
+
+            {/* NEW: LLM Borderline Assessment Checkbox */}
+            <div className="llm-borderline-option">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={useLlmBorderline}
+                  onChange={(e) => setUseLlmBorderline(e.target.checked)}
+                  disabled={loading}
+                  className="llm-checkbox"
+                />
+                <div className="checkbox-content">
+                  <strong>🤖 Enable AI Borderline Assessment (Experimental)</strong>
+                  <p className="checkbox-hint">
+                    Uses OpenAI GPT-4o-mini to review ambiguous matches (43-73% similarity).
+                    <br />
+                    <span className="warning-text">⚠️ Slower processing (~30-60s for 500 names) but more accurate for borderline cases.</span>
+                    <br />
+                    <span className="cost-text">💰 Est. cost: ~$2.50 per 500 names</span>
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
         )}
@@ -260,6 +301,24 @@ function FileUpload({ onFileProcessed, onError, loading, setLoading }) {
             <>
               <div className="spinner"></div>
               <p>Processing {fileName}...</p>
+
+              {/* NEW: Progress indicator */}
+              {progress && (
+                <div className="progress-container">
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill"
+                      style={{ width: `${progress.percent}%` }}
+                    />
+                  </div>
+                  <div className="progress-text">
+                    {progress.phase === 'upload' && 'Uploading file...'}
+                    {progress.phase === 'processing' && 'Processing names...'}
+                    {progress.phase === 'llm' && '🤖 AI assessing borderline pairs...'}
+                    {' '}{progress.percent}%
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>

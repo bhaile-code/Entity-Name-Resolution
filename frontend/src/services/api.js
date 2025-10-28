@@ -13,7 +13,9 @@ export const uploadFile = async (
   useAdaptiveThreshold = false,
   embeddingMode = 'openai-small',
   clusteringMode = 'fixed',
-  hacThreshold = 0.42
+  hacThreshold = 0.42,
+  useLlmBorderline = false,
+  onProgress = null
 ) => {
   const formData = new FormData()
   formData.append('file', file)
@@ -29,12 +31,29 @@ export const uploadFile = async (
   if (clusteringMode === 'hac') {
     params.append('hac_threshold', hacThreshold)
     params.append('hac_linkage', 'average')
+
+    // Add LLM borderline parameters if enabled
+    if (useLlmBorderline) {
+      params.append('use_llm_borderline', 'true')
+    }
+  }
+
+  // Configure request with extended timeout for LLM processing
+  const config = {
+    timeout: useLlmBorderline ? 600000 : API_CONFIG.TIMEOUT, // 5min for LLM, normal otherwise
+    onUploadProgress: (progressEvent) => {
+      if (onProgress) {
+        const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        onProgress({ phase: 'upload', percent: uploadPercent })
+      }
+    }
   }
 
   try {
     const response = await api.post(
       `/api/process?${params.toString()}`,
-      formData
+      formData,
+      config
     )
     return response.data
   } catch (error) {

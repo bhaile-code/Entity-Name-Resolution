@@ -97,6 +97,43 @@ class Settings:
     HAC_LINKAGE_METHOD: str = os.getenv("HAC_LINKAGE_METHOD", "average")
 
     # ============================================================
+    # LLM BORDERLINE ASSESSMENT CONFIGURATION
+    # ============================================================
+    # Enable LLM assessment for borderline similarity scores (HAC mode only)
+    # When enabled, uses AI to review ambiguous name pairs (43-73% similarity)
+    LLM_BORDERLINE_ENABLED: bool = os.getenv("LLM_BORDERLINE_ENABLED", "False").lower() == "true"
+
+    # LLM provider (currently only 'openai' supported)
+    LLM_BORDERLINE_PROVIDER: str = os.getenv("LLM_BORDERLINE_PROVIDER", "openai")
+
+    # OpenAI model for borderline assessment
+    # Options: 'gpt-4o-mini' (recommended, $0.0002/assessment), 'gpt-4o' (higher accuracy, $0.003/assessment)
+    LLM_BORDERLINE_MODEL: str = os.getenv("LLM_BORDERLINE_MODEL", "gpt-4o-mini")
+
+    # Borderline distance range (distance = 1 - similarity)
+    # Default: 0.27-0.57 = 43-73% similarity (straddles HAC threshold)
+    LLM_BORDERLINE_DISTANCE_LOW: float = float(os.getenv("LLM_BORDERLINE_DISTANCE_LOW", "0.27"))
+    LLM_BORDERLINE_DISTANCE_HIGH: float = float(os.getenv("LLM_BORDERLINE_DISTANCE_HIGH", "0.57"))
+
+    # Batch size for parallel LLM API calls (higher = faster but more memory)
+    LLM_BORDERLINE_BATCH_SIZE: int = int(os.getenv("LLM_BORDERLINE_BATCH_SIZE", "10"))
+
+    # Adjustment strength: How much LLM opinion affects similarity (0.0-1.0)
+    # 0.15 = conservative (15% max adjustment), 0.30 = aggressive (30% max adjustment)
+    LLM_BORDERLINE_ADJUSTMENT_STRENGTH: float = float(os.getenv("LLM_BORDERLINE_ADJUSTMENT_STRENGTH", "0.15"))
+
+    # ANTI-HALLUCINATION GUARDRAILS
+    # Minimum confidence threshold: LLM decisions below this are converted to "unknown"
+    # Higher = stricter (more "unknown" responses), Lower = more permissive
+    # Recommended: 0.60 (60% confidence minimum)
+    LLM_MIN_CONFIDENCE: float = float(os.getenv("LLM_MIN_CONFIDENCE", "0.60"))
+
+    # Allow "unknown" responses (STRONGLY RECOMMENDED: True)
+    # When True, LLM can respond "unknown" if uncertain
+    # When False, LLM forced to choose "same" or "different" (higher hallucination risk)
+    LLM_ALLOW_UNKNOWN: bool = os.getenv("LLM_ALLOW_UNKNOWN", "True").lower() == "true"
+
+    # ============================================================
     # STRATIFIED SAMPLING CONFIGURATION
     # ============================================================
 

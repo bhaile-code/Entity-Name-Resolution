@@ -13,6 +13,8 @@ class CompanyMapping(BaseModel):
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Confidence score (0-1)")
     group_id: int = Field(..., description="ID of the group this company belongs to")
     alternatives: List[str] = Field(default_factory=list, description="Other names in the same group")
+    llm_reviewed: bool = Field(default=False, description="Whether this match was LLM-assessed")
+    llm_decision: Optional[str] = Field(None, description="LLM decision: 'same'|'different'|'unknown'")
 
 
 class AuditLogEntry(BaseModel):
@@ -51,6 +53,33 @@ class GMMMetadata(BaseModel):
     cluster_weights: List[float] = Field(..., description="Weight (proportion) of each cluster")
     total_pairs_analyzed: int = Field(..., description="Number of pairs used for GMM fitting")
     high_cluster_index: Optional[int] = Field(None, description="Index of the 'same company' cluster")
+
+
+class GuardrailStats(BaseModel):
+    """Statistics about LLM guardrails."""
+    total_assessments: int = Field(..., description="Total LLM assessments made")
+    guardrails_triggered: int = Field(..., description="Number of times guardrails triggered")
+    unknown_responses: int = Field(..., description="Number of 'unknown' responses")
+    same_decisions: int = Field(..., description="Number of 'same' decisions")
+    different_decisions: int = Field(..., description="Number of 'different' decisions")
+    avg_confidence: float = Field(..., description="Average LLM confidence across all assessments")
+    low_confidence_converted: int = Field(default=0, description="Decisions downgraded due to low confidence")
+
+
+class LLMBorderlineMetadata(BaseModel):
+    """Metadata from LLM borderline assessment with guardrails."""
+    enabled: bool = Field(..., description="Whether LLM assessment was enabled")
+    total_borderline_pairs: int = Field(..., description="Total pairs in borderline range")
+    llm_assessments_made: int = Field(..., description="Number of LLM API calls made")
+    cache_hits: int = Field(..., description="Number of cached responses reused")
+    adjustments_applied: int = Field(..., description="Number of similarity scores adjusted")
+    distance_range: tuple = Field(..., description="Distance range for borderline (low, high)")
+    llm_provider: str = Field(..., description="LLM provider (e.g., 'openai')")
+    llm_model: str = Field(..., description="LLM model used (e.g., 'gpt-4o-mini')")
+    adjustment_strength: float = Field(..., description="Adjustment strength parameter")
+    min_confidence_threshold: float = Field(..., description="Minimum confidence threshold")
+    guardrail_stats: GuardrailStats = Field(..., description="Guardrail statistics")
+    api_cost_estimate: float = Field(..., description="Estimated API cost in USD")
 
 
 class ProcessingResult(BaseModel):

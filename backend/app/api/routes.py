@@ -41,7 +41,12 @@ async def process_companies(
     embedding_mode: str = Query(default=None),
     clustering_mode: str = Query(default=None),
     hac_threshold: float = Query(default=None),
-    hac_linkage: str = Query(default=None)
+    hac_linkage: str = Query(default=None),
+    use_llm_borderline: bool = Query(default=None),
+    llm_model: str = Query(default=None),
+    llm_distance_low: float = Query(default=None),
+    llm_distance_high: float = Query(default=None),
+    llm_min_confidence: float = Query(default=None)
 ):
     """
     Process uploaded CSV file containing company names.
@@ -60,10 +65,20 @@ async def process_companies(
                       If None, uses HAC_DISTANCE_THRESHOLD from settings
         hac_linkage: HAC linkage method ('average', 'single', 'complete', 'ward')
                     If None, uses HAC_LINKAGE_METHOD from settings
+        use_llm_borderline: Enable LLM assessment for borderline pairs (HAC mode only)
+                           If None, uses LLM_BORDERLINE_ENABLED from settings
+        llm_model: LLM model to use (e.g., 'gpt-4o-mini')
+                  If None, uses LLM_BORDERLINE_MODEL from settings
+        llm_distance_low: Lower bound of borderline distance range
+                         If None, uses LLM_BORDERLINE_DISTANCE_LOW from settings
+        llm_distance_high: Upper bound of borderline distance range
+                          If None, uses LLM_BORDERLINE_DISTANCE_HIGH from settings
+        llm_min_confidence: Minimum confidence threshold for LLM decisions
+                           If None, uses LLM_MIN_CONFIDENCE from settings
 
     Returns:
         ProcessingResult with mappings, audit log, summary statistics, and optional metadata
-        (gmm_metadata for adaptive_gmm mode, hac_metadata for hac mode)
+        (gmm_metadata for adaptive_gmm mode, hac_metadata for hac mode with llm_borderline if enabled)
 
     Raises:
         HTTPException: 400 for invalid input, 500 for processing errors
@@ -98,11 +113,16 @@ async def process_companies(
             embedding_mode=embedding_mode,
             clustering_mode=clustering_mode,
             hac_threshold=hac_threshold,
-            hac_linkage=hac_linkage
+            hac_linkage=hac_linkage,
+            use_llm_borderline=use_llm_borderline,
+            llm_model=llm_model,
+            llm_distance_low=llm_distance_low,
+            llm_distance_high=llm_distance_high,
+            llm_min_confidence=llm_min_confidence
         )
 
-        # Process names through matcher
-        result = matcher.process_names(company_names, filename=file.filename)
+        # Process names through matcher (now async)
+        result = await matcher.process_names(company_names, filename=file.filename)
 
         logger.info(
             f"Successfully processed {len(result['mappings'])} companies into "

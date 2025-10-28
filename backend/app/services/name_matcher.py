@@ -38,7 +38,12 @@ class NameMatcher:
         embedding_mode: str = None,
         clustering_mode: str = None,
         hac_threshold: float = None,
-        hac_linkage: str = None
+        hac_linkage: str = None,
+        use_llm_borderline: bool = None,
+        llm_model: str = None,
+        llm_distance_low: float = None,
+        llm_distance_high: float = None,
+        llm_min_confidence: float = None
     ):
         """
         Initialize the name matcher.
@@ -52,6 +57,11 @@ class NameMatcher:
             clustering_mode: 'fixed', 'adaptive_gmm', or 'hac'. If not provided, infers from use_adaptive_threshold
             hac_threshold: HAC distance threshold (0-1 range). Defaults to settings.HAC_DISTANCE_THRESHOLD
             hac_linkage: HAC linkage method. Defaults to settings.HAC_LINKAGE_METHOD
+            use_llm_borderline: Enable LLM assessment for borderline pairs (HAC mode only)
+            llm_model: LLM model to use (e.g., 'gpt-4o-mini')
+            llm_distance_low: Lower bound of borderline distance range
+            llm_distance_high: Upper bound of borderline distance range
+            llm_min_confidence: Minimum confidence threshold for LLM decisions
         """
         self.similarity_threshold = similarity_threshold or settings.SIMILARITY_THRESHOLD
         self.common_suffixes = settings.CORPORATE_SUFFIXES
@@ -81,6 +91,40 @@ class NameMatcher:
         # Initialize embedding service
         self.embedding_mode = embedding_mode or settings.DEFAULT_EMBEDDING_MODE
         self.embedding_service = create_embedding_service(self.embedding_mode)
+
+        # Initialize LLM borderline assessor (only if HAC mode and enabled)
+        self.use_llm_borderline = use_llm_borderline if use_llm_borderline is not None else settings.LLM_BORDERLINE_ENABLED
+        self.llm_assessor = None
+        self._llm_reviewed_pairs = set()  # Track which pairs were LLM-reviewed
+
+        if self.use_llm_borderline and self.clustering_mode == 'hac':
+            try:
+                from app.services.llm_borderline_service import LLMBorderlineAssessor
+                self.llm_assessor = LLMBorderlineAssessor(
+                    model=llm_model or settings.LLM_BORDERLINE_MODEL,
+                    distance_range=(
+                        llm_distance_low or settings.LLM_BORDERLINE_DISTANCE_LOW,
+                        llm_distance_high or settings.LLM_BORDERLINE_DISTANCE_HIGH
+                    ),
+                    adjustment_strength=settings.LLM_BORDERLINE_ADJUSTMENT_STRENGTH,
+                    openai_api_key=settings.OPENAI_API_KEY,
+                    min_confidence=llm_min_confidence or settings.LLM_MIN_CONFIDENCE,
+                    allow_unknown=settings.LLM_ALLOW_UNKNOWN
+                )
+                logger.info(
+                    f"LLM borderline assessment enabled (model={self.llm_assessor.model}, "
+                    f"min_confidence={self.llm_assessor.min_confidence})"
+                )
+            except Exception as e:
+                logger.error(f"Failed to initialize LLM assessor: {e}. Continuing without LLM assessment.")
+                self.use_llm_borderline = False
+                self.llm_assessor = None
+        elif self.use_llm_borderline and self.clustering_mode != 'hac':
+            logger.warning(
+                "LLM borderline assessment is only supported in HAC mode. "
+                "Ignoring use_llm_borderline=True."
+            )
+            self.use_llm_borderline = False
 
         mode_desc = {
             'fixed': f"fixed threshold: {self.similarity_threshold}%",
@@ -604,7 +648,7 @@ class NameMatcher:
                    f"({(1 - len(groups)/len(names))*100:.1f}% reduction)")
         return groups
 
-    def process_names(self, names: List[str], filename: str = "unknown") -> Dict:
+    async def process_names(self, names: List[str], filename: str = "unknown") -> Dict:
         """
         Process a list of company names and return complete results.
 
@@ -690,8 +734,24 @@ class NameMatcher:
             logger.info("Using HAC clustering mode")
             similarity_matrix = self._build_similarity_matrix(names)
 
-            # Run HAC clustering
+            # NEW: Apply LLM borderline assessment if enabled
+            llm_metadata = None
+            if self.llm_assessor:
+                logger.info("Starting LLM borderline assessment (async)")
+                try:
+                    similarity_matrix, llm_metadata = await self._apply_llm_borderline_assessment(
+                        names, similarity_matrix
+                    )
+                except Exception as e:
+                    logger.error(f"LLM assessment failed: {e}. Continuing with original similarity matrix.", exc_info=True)
+                    llm_metadata = {'enabled': False, 'error': str(e)}
+
+            # Run HAC clustering (on potentially LLM-adjusted matrix)
             hac_clusters, hac_metadata = self.hac_service.cluster_names(names, similarity_matrix)
+
+            # Add LLM metadata to HAC metadata if available
+            if llm_metadata and llm_metadata.get('enabled', False):
+                hac_metadata['llm_borderline'] = llm_metadata
 
             # Convert HAC output format to groups list format
             groups = [hac_clusters[cluster_id] for cluster_id in sorted(hac_clusters.keys())]
@@ -833,3 +893,166 @@ class NameMatcher:
             result["sampling_metadata"] = sampling_metadata
 
         return result
+
+    async def _apply_llm_borderline_assessment(
+        self,
+        names: List[str],
+        similarity_matrix: np.ndarray
+    ) -> Tuple[np.ndarray, Dict]:
+        """
+        Apply LLM assessment to borderline pairs with progress tracking and guardrail stats.
+
+        Args:
+            names: List of company names
+            similarity_matrix: Current similarity matrix (n x n)
+
+        Returns:
+            Tuple of (adjusted_similarity_matrix, llm_metadata_dict)
+        """
+        n = len(names)
+        borderline_pairs = []
+
+        # Find borderline pairs (within configured distance range)
+        logger.info(
+            f"Scanning {n*(n-1)//2:,} pairs for borderline matches "
+            f"(distance {self.llm_assessor.distance_low:.2f}-{self.llm_assessor.distance_high:.2f})"
+        )
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                similarity = similarity_matrix[i, j]
+                distance = 1.0 - similarity
+
+                if self.llm_assessor.distance_low <= distance <= self.llm_assessor.distance_high:
+                    borderline_pairs.append((names[i], names[j], similarity, i, j))
+
+        logger.info(
+            f"Found {len(borderline_pairs):,} borderline pairs for LLM assessment "
+            f"({len(borderline_pairs)/(n*(n-1)//2)*100:.1f}% of total pairs)"
+        )
+
+        if len(borderline_pairs) == 0:
+            logger.info("No borderline pairs found - skipping LLM assessment")
+            return similarity_matrix, {
+                'enabled': True,
+                'total_borderline_pairs': 0,
+                'llm_assessments_made': 0,
+                'cache_hits': 0,
+                'adjustments_applied': 0,
+                'distance_range': (self.llm_assessor.distance_low, self.llm_assessor.distance_high),
+                'llm_provider': 'openai',
+                'llm_model': self.llm_assessor.model,
+                'adjustment_strength': self.llm_assessor.adjustment_strength,
+                'min_confidence_threshold': self.llm_assessor.min_confidence,
+                'guardrail_stats': {
+                    'total_assessments': 0,
+                    'guardrails_triggered': 0,
+                    'unknown_responses': 0,
+                    'same_decisions': 0,
+                    'different_decisions': 0,
+                    'avg_confidence': 0.0,
+                    'low_confidence_converted': 0
+                },
+                'api_cost_estimate': 0.0
+            }
+
+        # Progress callback for logging
+        def progress_callback(current, total, phase):
+            pct = (current / total) * 100
+            logger.info(
+                f"LLM assessment progress: {current:,}/{total:,} pairs ({pct:.0f}%) - {phase}"
+            )
+
+        # Get LLM assessments (async with batching)
+        llm_input = [(name1, name2, sim) for name1, name2, sim, _, _ in borderline_pairs]
+        llm_assessments = await self.llm_assessor.assess_pairs_batch(
+            llm_input,
+            progress_callback=progress_callback
+        )
+
+        # Adjust similarity matrix and track statistics
+        adjusted_matrix = similarity_matrix.copy()
+        llm_reviewed_pairs = set()
+
+        # Track guardrail statistics
+        guardrail_stats = {
+            'total_assessments': 0,
+            'guardrails_triggered': 0,
+            'unknown_responses': 0,
+            'same_decisions': 0,
+            'different_decisions': 0,
+            'avg_confidence': 0.0,
+            'low_confidence_converted': 0
+        }
+
+        total_confidence = 0.0
+
+        for (name1, name2, _, i, j) in borderline_pairs:
+            cache_key = self.llm_assessor._get_cache_key(name1, name2)
+            assessment = llm_assessments.get(cache_key)
+
+            if assessment:
+                guardrail_stats['total_assessments'] += 1
+
+                # Track decision types
+                if assessment['decision'] == 'unknown':
+                    guardrail_stats['unknown_responses'] += 1
+                elif assessment['decision'] == 'same':
+                    guardrail_stats['same_decisions'] += 1
+                elif assessment['decision'] == 'different':
+                    guardrail_stats['different_decisions'] += 1
+
+                # Track guardrail triggers
+                if assessment.get('guardrails_triggered', False):
+                    guardrail_stats['guardrails_triggered'] += 1
+
+                # Track confidence
+                total_confidence += assessment['llm_confidence']
+
+                # Apply adjustment to similarity matrix
+                adjusted_sim = assessment['adjusted_similarity']
+                adjusted_matrix[i, j] = adjusted_sim
+                adjusted_matrix[j, i] = adjusted_sim
+
+                # Track LLM-reviewed pairs for later flagging
+                llm_reviewed_pairs.add((min(i, j), max(i, j)))
+
+        # Calculate average confidence
+        if guardrail_stats['total_assessments'] > 0:
+            guardrail_stats['avg_confidence'] = total_confidence / guardrail_stats['total_assessments']
+
+        # Store LLM-reviewed pairs for later use in mappings
+        self._llm_reviewed_pairs = llm_reviewed_pairs
+
+        # Generate metadata
+        adjustments_applied = len([
+            a for a in llm_assessments.values()
+            if abs(a['adjusted_similarity'] - a['original_similarity']) > 0.001
+        ])
+
+        metadata = {
+            'enabled': True,
+            'total_borderline_pairs': len(borderline_pairs),
+            'llm_assessments_made': len(llm_assessments),
+            'cache_hits': len(borderline_pairs) - len(llm_assessments),
+            'adjustments_applied': adjustments_applied,
+            'distance_range': (self.llm_assessor.distance_low, self.llm_assessor.distance_high),
+            'llm_provider': 'openai',
+            'llm_model': self.llm_assessor.model,
+            'adjustment_strength': self.llm_assessor.adjustment_strength,
+            'min_confidence_threshold': self.llm_assessor.min_confidence,
+            'guardrail_stats': guardrail_stats,
+            'api_cost_estimate': len(llm_assessments) * 0.0002  # Rough estimate for gpt-4o-mini
+        }
+
+        logger.info(
+            f"LLM assessment complete: {guardrail_stats['unknown_responses']} unknown, "
+            f"{guardrail_stats['same_decisions']} same, {guardrail_stats['different_decisions']} different, "
+            f"{guardrail_stats['guardrails_triggered']} guardrails triggered"
+        )
+        logger.info(
+            f"Applied {adjustments_applied} similarity adjustments "
+            f"(avg confidence: {guardrail_stats['avg_confidence']:.2f})"
+        )
+
+        return adjusted_matrix, metadata
